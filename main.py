@@ -6,11 +6,15 @@ import requests
 import websocket
 from keep_alive import keep_alive
 
-status = os.getenv("status") #online/dnd/idle
-
-custom_status = os.getenv("custom_status") #If you don't need a custom status on your profile, just put "" instead of "youtube.com/@SealedSaucer"
-
+# Configurações de status e token
+status = os.getenv("status")  # online/dnd/idle
+custom_status = os.getenv("custom_status")  # Exemplo: "youtube.com/@SealedSaucer"
 usertoken = os.getenv("token")
+
+# IDs do servidor e canal de voz
+guild_id = os.getenv("GUILD_ID")  # ID do servidor (guild) onde o bot deve entrar
+voice_channel_id = os.getenv("VOICE_CHANNEL_ID")  # ID do canal de voz onde o bot deve entrar
+
 if not usertoken:
     print("[ERROR] Please add a token inside Secrets.")
     sys.exit()
@@ -57,12 +61,6 @@ def onliner(token, status):
                     "state": custom_status,
                     "name": "Custom Status",
                     "id": "custom",
-                    #Uncomment the below lines if you want an emoji in the status
-                    #"emoji": {
-                        #"name": "emoji name",
-                        #"id": "emoji id",
-                        #"animated": False,
-                    #},
                 }
             ],
             "status": status,
@@ -74,9 +72,28 @@ def onliner(token, status):
     time.sleep(heartbeat / 1000)
     ws.send(json.dumps(online))
 
+def join_voice_channel():
+    """Função para conectar o bot ao canal de voz especificado no servidor"""
+    if not guild_id or not voice_channel_id:
+        print("[ERROR] Please set GUILD_ID and VOICE_CHANNEL_ID in environment variables.")
+        return
+
+    # Endpoint para ingressar no canal de voz
+    url = f"https://discord.com/api/v9/guilds/{guild_id}/voice-states/@me"
+    payload = {
+        "channel_id": voice_channel_id
+    }
+    response = requests.patch(url, headers=headers, json=payload)
+
+    if response.status_code == 204:
+        print(f"Successfully connected to voice channel {voice_channel_id} in guild {guild_id}")
+    else:
+        print(f"[ERROR] Could not connect to voice channel: {response.status_code} - {response.text}")
+
 def run_onliner():
     os.system("clear")
     print(f"Logged in as {username}#{discriminator} ({userid}).")
+    join_voice_channel()  # Chama a função para conectar no canal de voz ao iniciar
     while True:
         onliner(usertoken, status)
         time.sleep(30)
