@@ -4,16 +4,14 @@ import json
 import time
 import requests
 import websocket
+import schedule  # Biblioteca para agendar tarefas
 from keep_alive import keep_alive
 
 # Configurações de status e token
 status = os.getenv("status")  # online/dnd/idle
 custom_status = os.getenv("custom_status")  # Exemplo: "youtube.com/@SealedSaucer"
 usertoken = os.getenv("token")
-
-# IDs do servidor e canal de voz
-guild_id = os.getenv("GUILD_ID")  # ID do servidor (guild) onde o bot deve entrar
-voice_channel_id = os.getenv("VOICE_CHANNEL_ID")  # ID do canal de voz onde o bot deve entrar
+daily_channel_id = os.getenv("DAILY_CHANNEL_ID")  # ID do canal onde o comando será enviado
 
 if not usertoken:
     print("[ERROR] Please add a token inside Secrets.")
@@ -78,11 +76,8 @@ def join_voice_channel():
         print("[ERROR] Please set GUILD_ID and VOICE_CHANNEL_ID in environment variables.")
         return
 
-    # Endpoint para ingressar no canal de voz
     url = f"https://discord.com/api/v9/guilds/{guild_id}/voice-states/@me"
-    payload = {
-        "channel_id": voice_channel_id
-    }
+    payload = {"channel_id": voice_channel_id}
     response = requests.patch(url, headers=headers, json=payload)
 
     if response.status_code == 204:
@@ -90,13 +85,34 @@ def join_voice_channel():
     else:
         print(f"[ERROR] Could not connect to voice channel: {response.status_code} - {response.text}")
 
+def send_daily_command():
+    """Função para enviar o comando /daily no canal configurado"""
+    if not daily_channel_id:
+        print("[ERROR] DAILY_CHANNEL_ID not set.")
+        return
+
+    url = f"https://discord.com/api/v9/channels/{daily_channel_id}/messages"
+    payload = {"content": "/daily"}
+    response = requests.post(url, headers=headers, json=payload)
+
+    if response.status_code == 200:
+        print(f"Successfully sent '/daily' in channel {daily_channel_id}")
+    else:
+        print(f"[ERROR] Could not send '/daily': {response.status_code} - {response.text}")
+
+def schedule_daily_command():
+    """Agendar o envio do comando /daily para as 11h"""
+    schedule.every().day.at("11:00").do(send_daily_command)
+
 def run_onliner():
     os.system("clear")
     print(f"Logged in as {username}#{discriminator} ({userid}).")
-    join_voice_channel()  # Chama a função para conectar no canal de voz ao iniciar
+    join_voice_channel()  # Conecta ao canal de voz ao iniciar
+    schedule_daily_command()  # Agenda o envio diário do comando /daily
     while True:
         onliner(usertoken, status)
-        time.sleep(30)
+        schedule.run_pending()  # Executa tarefas agendadas
+        time.sleep(1)
 
 keep_alive()
 run_onliner()
